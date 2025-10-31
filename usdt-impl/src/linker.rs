@@ -180,7 +180,7 @@ fn compile_probe(
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     compile_error!("USDT only supports x86_64 and AArch64 architectures");
 
-    let impl_block = quote! {
+    let extern_block = quote! {
         unsafe extern "C" {
             #[allow(unused)]
             #[link_name = #stability]
@@ -198,26 +198,43 @@ fn compile_probe(
             #[link_name = #probe]
             fn #extern_probe_fn(#(#ffi_param_list,)*);
         }
+    };
+
+    let call = quote! {
         unsafe {
-            if #is_enabled_fn() != 0 {
-                #arg_lambda
-                #type_check_fn
-                #unpacked_args
-                ::std::arch::asm!(
-                    ".reference {typedefs}",
-                    #call_instruction,
-                    ".reference {stability}",
-                    typedefs = sym #typedef_fn,
-                    extern_probe_fn = sym #extern_probe_fn,
-                    stability = sym #stability_fn,
-                    #in_regs
-                    options(nomem, nostack, preserves_flags)
-                );
-            }
+            ::std::arch::asm!(
+                ".reference {typedefs}",
+                #call_instruction,
+                ".reference {stability}",
+                typedefs = sym #typedef_fn,
+                extern_probe_fn = sym #extern_probe_fn,
+                stability = sym #stability_fn,
+                #in_regs
+                options(nomem, nostack, preserves_flags)
+            );
         }
     };
 
-    common::build_probe_macro(config, probe_name, types, impl_block)
+    let eager = quote! {
+        #extern_block
+        #arg_lambda
+        #type_check_fn
+        #unpacked_args
+        #call
+    };
+
+    let lazy = quote! {
+        #extern_block
+        if unsafe { #is_enabled_fn() } != 0 {
+            ::usdt::cold();
+            #arg_lambda
+            #type_check_fn
+            #unpacked_args
+            #call
+        }
+    };
+
+    common::build_probe_macro(config, probe_name, types, eager, lazy)
 }
 
 #[derive(Debug, Default, Clone)]

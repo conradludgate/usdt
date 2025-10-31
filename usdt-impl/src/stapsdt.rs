@@ -202,7 +202,8 @@ fn compile_probe(
     );
 
     let sema_name = format_ident!("__usdt_sema_{}_{}", provider.name, probe.name);
-    let impl_block = quote! {
+
+    let extern_block = quote! {
         unsafe extern "C" {
             // Note: C libraries use a struct containing an unsigned short
             // for the semaphore counter. Using just a u16 here directly
@@ -211,6 +212,30 @@ fn compile_probe(
             // knowledge.
             static #sema_name: u16;
         }
+    };
+
+    let call = quote! {
+        #[allow(named_asm_labels)]
+        unsafe {
+            ::std::arch::asm!(
+                "990:   nop",
+                #probe_rec,
+                #in_regs
+                options(nomem, nostack, preserves_flags)
+            );
+        }
+    };
+
+    let eager = quote! {
+        #extern_block
+        #arg_lambda
+        #type_check_fn
+        #unpacked_args
+        #call
+    };
+
+    let lazy =quote! {
+        #extern_block
 
         let is_enabled: u16;
         unsafe {
@@ -218,21 +243,15 @@ fn compile_probe(
         }
 
         if is_enabled != 0 {
+            ::usdt::cold();
             #arg_lambda
             #type_check_fn
             #unpacked_args
-            #[allow(named_asm_labels)]
-            unsafe {
-                ::std::arch::asm!(
-                    "990:   nop",
-                    #probe_rec,
-                    #in_regs
-                    options(nomem, nostack, preserves_flags)
-                );
-            }
+            #call
         }
     };
-    common::build_probe_macro(config, &probe.name, &probe.types, impl_block)
+
+    common::build_probe_macro(config, &probe.name, &probe.types, eager, lazy)
 }
 
 pub fn register_probes() -> Result<(), crate::Error> {

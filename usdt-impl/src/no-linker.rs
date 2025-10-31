@@ -89,7 +89,8 @@ fn compile_probe(
         &probe.types,
     );
 
-    let impl_block = quote! {
+    // I don't know whether it's safe to remove the is_enabled check here.
+    let eager = quote! {
         {
             let mut is_enabled: u64;
             unsafe {
@@ -116,7 +117,37 @@ fn compile_probe(
             }
         }
     };
-    common::build_probe_macro(config, &probe.name, &probe.types, impl_block)
+
+    let lazy = quote! {
+        {
+            let mut is_enabled: u64;
+            unsafe {
+                ::std::arch::asm!(
+                    "990:   clr rax",
+                    #is_enabled_rec,
+                    out("rax") is_enabled,
+                    options(nomem, nostack)
+                );
+            }
+
+            if is_enabled != 0 {
+                ::usdt::cold();
+                #arg_lambda
+                #type_check_fn
+                #unpacked_args
+                unsafe {
+                    ::std::arch::asm!(
+                        "990:   nop",
+                        #probe_rec,
+                        #in_regs
+                        options(nomem, nostack, preserves_flags)
+                    );
+                }
+            }
+        }
+    };
+
+    common::build_probe_macro(config, &probe.name, &probe.types, eager, lazy)
 }
 
 fn extract_probe_records_from_section() -> Result<Section, crate::Error> {

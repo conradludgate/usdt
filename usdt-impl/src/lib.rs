@@ -100,6 +100,11 @@ impl CompileProvidersConfig {
         quote::format_ident!("{}", self.format_probe(probe_name))
     }
 
+    /// Return the formatted name of the probe as an identifier.
+    pub fn probe_ident_eager(&self, probe_name: &str) -> proc_macro2::Ident {
+        quote::format_ident!("{}_eager", self.format_probe(probe_name))
+    }
+
     /// Return the formatted module name as an identifier.
     pub fn module_ident(&self) -> proc_macro2::Ident {
         let name = self.module.as_ref().unwrap_or_else(|| {

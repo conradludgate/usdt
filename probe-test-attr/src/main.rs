@@ -96,6 +96,7 @@ fn main() {
     let buffer = [2; 4];
     loop {
         test::start_work!(|| arg.x);
+        test::start_work_eager!(|| arg.x);
         std::thread::sleep(std::time::Duration::from_secs(1));
         arg.x = arg.x.wrapping_add(1);
         test::stop_work!(|| { (format!("the probe has fired {}", arg.x), &arg) });

@@ -205,30 +205,47 @@ pub(crate) fn build_probe_macro(
     config: &crate::CompileProvidersConfig,
     probe_name: &str,
     types: &[DataType],
-    impl_block: TokenStream,
+    eager: TokenStream,
+    lazy: TokenStream,
 ) -> TokenStream {
     let module = config.module_ident();
-    let macro_name = config.probe_ident(probe_name);
+    let lazy_macro_name = config.probe_ident(probe_name);
+    let eager_macro_name = config.probe_ident_eager(probe_name);
+
     let no_args_match = if types.is_empty() {
-        quote! { () => { crate::#module::#macro_name!(|| ()) }; }
+        quote! { () => { crate::#module::#eager_macro_name!(|| ()) }; }
     } else {
         quote! {}
     };
     quote! {
         #[allow(unused_macros)]
-        macro_rules! #macro_name {
+        macro_rules! #lazy_macro_name {
             #no_args_match
             ($tree:tt) => {
                 compile_error!("USDT probe macros should be invoked with a closure returning the arguments");
             };
             ($args_lambda:expr) => {
                 {
-                    #impl_block
+                    #lazy
                 }
             };
         }
         #[allow(unused_imports)]
-        pub(crate) use #macro_name;
+        pub(crate) use #lazy_macro_name;
+        #[allow(unused_macros)]
+        macro_rules! #eager_macro_name {
+            #no_args_match
+            ($tree:tt) => {
+                compile_error!("USDT probe macros should be invoked with a closure returning the arguments");
+            };
+            ($args_lambda:expr) => {
+                {
+                    #eager
+                }
+            };
+        }
+        #[allow(unused_imports)]
+        pub(crate) use #eager_macro_name;
     }
 }
 

@@ -299,6 +299,10 @@ pub use usdt_impl::{to_json, SerializeString};
 pub use usdt_impl::{Error, UniqueId};
 pub use usdt_macro::dtrace_provider;
 
+#[doc(hidden)]
+#[cold]
+pub fn cold() {}
+
 /// A simple struct used to build DTrace probes into Rust code in a build.rs script.
 #[derive(Debug)]
 pub struct Builder {
