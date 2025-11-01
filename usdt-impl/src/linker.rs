@@ -170,6 +170,7 @@ fn compile_probe(
         syn::parse2::<syn::FnArg>(quote! { _: #ty }).unwrap()
     });
     let (arg_lambda, unpacked_args, in_regs) = common::construct_probe_args(types);
+    let arg_lambda_sig = common::args_closure_sig(types);
     let type_check_fn =
         common::construct_type_check(&provider.name, probe_name, &provider.use_statements, types);
 
@@ -184,11 +185,11 @@ fn compile_probe(
         unsafe extern "C" {
             #[allow(unused)]
             #[link_name = #stability]
-            fn stability();
+            fn #stability_fn();
 
             #[allow(unused)]
             #[link_name = #typedefs]
-            fn typedefs();
+            fn #typedef_fn();
 
             #[allow(unused)]
             #[link_name = #is_enabled]
@@ -201,35 +202,38 @@ fn compile_probe(
     };
 
     let call = quote! {
-        unsafe {
-            ::std::arch::asm!(
-                ".reference {typedefs}",
-                #call_instruction,
-                ".reference {stability}",
-                typedefs = sym #typedef_fn,
-                extern_probe_fn = sym #extern_probe_fn,
-                stability = sym #stability_fn,
-                #in_regs
-                options(nomem, nostack, preserves_flags)
-            );
+        #arg_lambda_sig {
+            #arg_lambda
+            #unpacked_args
+            unsafe {
+                ::std::arch::asm!(
+                    ".reference {typedefs}",
+                    #call_instruction,
+                    ".reference {stability}",
+                    typedefs = sym #typedef_fn,
+                    extern_probe_fn = sym #extern_probe_fn,
+                    stability = sym #stability_fn,
+                    #in_regs
+                    options(nomem, nostack, preserves_flags)
+                );
+            }
         }
+
+        probe($args_lambda)
     };
 
     let eager = quote! {
         #extern_block
-        #arg_lambda
-        #type_check_fn
-        #unpacked_args
+
+        #[inline(always)]
         #call
     };
 
     let lazy = quote! {
         #extern_block
         if unsafe { #is_enabled_fn() } != 0 {
-            ::usdt::cold();
-            #arg_lambda
-            #type_check_fn
-            #unpacked_args
+            #[cold]
+            #[inline(never)]
             #call
         }
     };

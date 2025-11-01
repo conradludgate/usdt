@@ -15,7 +15,10 @@
 // limitations under the License.
 
 use serde::Deserialize;
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    ffi::{CStr, CString},
+};
 use thiserror::Error;
 
 // Probe record parsing required for standard backend (and `des` feature used by `dusty util)
@@ -47,6 +50,186 @@ mod common;
 /// guarantee that the library's probes are registered.
 pub fn register_probes() -> Result<(), Error> {
     crate::internal::register_probes()
+}
+
+pub trait EncodeArg<Arg> {
+    type Repr: EncodeRepr;
+
+    fn encode(self) -> Self::Repr;
+}
+
+impl<T: serde::Serialize> EncodeArg<(T,)> for &T {
+    type Repr = Vec<u8>;
+
+    fn encode(self) -> Self::Repr {
+        match to_json(&self) {
+            Ok(json) => format!("{{\"ok\":{json}}}\0").into_bytes(),
+            Err(e) => format!("{{\"err\":\"{e}\"}}\0").into_bytes(),
+        }
+    }
+}
+
+impl<T: serde::Serialize> EncodeArg<(T,)> for T {
+    type Repr = Vec<u8>;
+
+    fn encode(self) -> Self::Repr {
+        match to_json(&self) {
+            Ok(json) => format!("{{\"ok\":{json}}}\0").into_bytes(),
+            Err(e) => format!("{{\"err\":\"{e}\"}}\0").into_bytes(),
+        }
+    }
+}
+
+impl EncodeArg<()> for u8 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for u16 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for u32 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for u64 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const u8 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const u16 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const u32 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const u64 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const i8 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const i16 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const i32 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for *const i64 {
+    type Repr = usize;
+
+    fn encode(self) -> Self::Repr {
+        self as usize
+    }
+}
+
+impl EncodeArg<()> for CString {
+    type Repr = Vec<u8>;
+
+    fn encode(self) -> Self::Repr {
+        let mut v = self.into_bytes();
+        v.push(0);
+        v
+    }
+}
+
+impl<'a> EncodeArg<()> for &'a CStr {
+    type Repr = &'a [u8];
+    fn encode(self) -> Self::Repr {
+        self.as_ref().to_bytes_with_nul()
+    }
+}
+
+impl EncodeArg<()> for String {
+    type Repr = Vec<u8>;
+
+    fn encode(self) -> Self::Repr {
+        let mut v = self.into_bytes();
+        v.push(0);
+        v
+    }
+}
+
+impl EncodeArg<()> for &str {
+    type Repr = Vec<u8>;
+    fn encode(self) -> Self::Repr {
+        [self.as_bytes(), b"0"].concat()
+    }
+}
+
+pub trait EncodeRepr {
+    fn as_reg(&self) -> usize;
+}
+
+impl EncodeRepr for Vec<u8> {
+    fn as_reg(&self) -> usize {
+        self.as_ptr() as usize
+    }
+}
+
+impl EncodeRepr for &[u8] {
+    fn as_reg(&self) -> usize {
+        self.as_ptr() as usize
+    }
+}
+
+impl EncodeRepr for usize {
+    fn as_reg(&self) -> usize {
+        *self
+    }
 }
 
 /// Errors related to building DTrace probes into Rust code

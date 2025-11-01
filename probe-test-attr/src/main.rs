@@ -1,3 +1,4 @@
+#![feature(core_intrinsics)]
 //! Example using the `usdt` crate, defining probes inline in Rust code which accept any
 //! serializable data type.
 
@@ -14,6 +15,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use std::intrinsics::breakpoint;
 
 use serde::Serialize;
 
@@ -66,15 +69,15 @@ mod test {
     fn start_work(x: u8) {}
 
     /// Parameters need not have names, and may be taken by reference...
-    fn stop_work(_: String, arg: &Arg) {}
+    fn stop_work(_: String, arg: Arg) {}
 
     /// ... or by value
     fn stop_work_by_value(_: String, _: Arg) {}
 
-    /// Probes usually contain standard path types, such as `u8` or `std::net::IpAddr`. However,
-    /// they may also contain slices, arrays, tuples, and references. In these cases, as in the
-    /// case of any non-native D type, the value will be JSON serialized when sending to DTrace.
-    fn arg_as_tuple(_: (u8, &[i32])) {}
+    // /// Probes usually contain standard path types, such as `u8` or `std::net::IpAddr`. However,
+    // /// they may also contain slices, arrays, tuples, and references. In these cases, as in the
+    // /// case of any non-native D type, the value will be JSON serialized when sending to DTrace.
+    // fn arg_as_tuple(_: (u8, &'static [i32])) {}
 
     /// Some types aren't JSON serializable. These will not break the program, but an error message
     /// will be seen in DTrace.
@@ -95,6 +98,7 @@ fn main() {
     };
     let buffer = [2; 4];
     loop {
+        unsafe { breakpoint() };
         test::start_work!(|| arg.x);
         test::start_work_eager!(|| arg.x);
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -107,7 +111,7 @@ fn main() {
             };
             (format!("the probe has fired {}", arg.x), new_arg)
         });
-        test::arg_as_tuple!(|| (arg.x, &arg.buffer[..]));
+        // test::arg_as_tuple!(|| (arg.x, &arg.buffer[..]));
         test::not_json_serializable!(|| Whoops::NoBueno(0));
         test::work_with_pointer!(|| (buffer.as_ptr(), buffer.len() as u64));
         test::cstring!(|| (c"hello world", c"and when owned".to_owned()));

@@ -138,19 +138,19 @@ fn generate_provider_item(
         use_statements: use_statements.clone(),
     };
     let compiled = usdt_impl::compile_provider(&provider, &config);
-    let type_checks = if check_fns.is_empty() {
-        quote! { const _: fn() = || {}; }
-    } else {
-        quote! {
-            const _: fn() = || {
-                #(#use_statements)*
-                fn usdt_types_must_be_serialize<T: ?Sized + ::serde::Serialize>() {}
-                #(#check_fns)*
-            };
-        }
-    };
+    // let type_checks = if check_fns.is_empty() {
+    //     quote! { const _: fn() = || {}; }
+    // } else {
+    //     quote! {
+    //         const _: fn() = || {
+    //             #(#use_statements)*
+    //             fn usdt_types_must_be_serialize<T: ?Sized + ::serde::Serialize>() {}
+    //             #(#check_fns)*
+    //         };
+    //     }
+    // };
     Ok(quote! {
-        #type_checks
+        // #type_checks
         #compiled
     })
 }

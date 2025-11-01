@@ -295,12 +295,13 @@ use std::{env, fs};
 
 pub use usdt_attr_macro::provider;
 #[doc(hidden)]
-pub use usdt_impl::{to_json, SerializeString};
+pub use usdt_impl::{to_json, SerializeString, EncodeArg, EncodeRepr};
 pub use usdt_impl::{Error, UniqueId};
 pub use usdt_macro::dtrace_provider;
 
 #[doc(hidden)]
 #[cold]
+#[inline(always)]
 pub fn cold() {}
 
 /// A simple struct used to build DTrace probes into Rust code in a build.rs script.

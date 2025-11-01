@@ -96,11 +96,35 @@ pub fn construct_type_check(
     }
 }
 
+pub fn args_closure_sig(types: &[DataType]) -> TokenStream {
+    let (ts, wheres): (Vec<_>, Vec<_>) = types
+        .iter()
+        .enumerate()
+        .map(|(i, typ)| (format_ident!("__T{i}"), typ.encode_args()))
+        .unzip();
+
+    quote! {
+        fn probe<F, #(#ts),*>(args: F)
+        where
+            F: FnOnce() -> (#(#ts),*),
+            #(#ts: #wheres,)*
+    }
+}
+
 fn shared_slice_elem_type(reference: &syn::TypeReference) -> Option<&syn::Type> {
     if let syn::Type::Slice(slice) = &*reference.elem {
         Some(&*slice.elem)
     } else {
         None
+    }
+}
+
+impl DataType {
+    fn encode_args(&self) -> TokenStream {
+        match self {
+            DataType::Serializable(ty) => quote! { ::usdt::EncodeArg<(#ty,)> },
+            _ => quote! { ::usdt::EncodeArg<()> },
+        }
     }
 }
 
@@ -126,19 +150,15 @@ pub fn construct_probe_args(types: &[DataType]) -> (TokenStream, TokenStream, To
         .zip(&abi_regs)
         .enumerate()
         .map(|(i, (typ, reg))| {
-            let arg = format_ident!("arg_{}", i);
+            let arg = format_ident!("arg_{i}");
             let index = syn::Index::from(i);
-            let input = quote! { args.#index };
-            let (value, at_use) = asm_type_convert(typ, input);
 
-            // These values must refer to the actual traced data and prevent it
-            // from being dropped until after we've completed the probe
-            // invocation.
+            let repr = typ.encode_args();
             let destructured_arg = quote! {
-                let #arg = #value;
+                let #arg = <_ as #repr>::encode(args.#index);
             };
             // Here, we convert the argument to store it within a register.
-            let register_arg = quote! { in(#reg) (#arg #at_use) };
+            let register_arg = quote! { in(#reg) (::usdt::EncodeRepr::as_reg(&#arg)) };
 
             (destructured_arg, register_arg)
         })
@@ -155,9 +175,9 @@ pub fn call_argument_closure(types: &[DataType]) -> TokenStream {
         // Don't bother with any closure if there are no arguments.
         0 => quote! {},
         // Wrap a single argument in a tuple.
-        1 => quote! { let args = (($args_lambda)(),); },
+        1 => quote! { let args = ((args)(),); },
         // General case.
-        _ => quote! { let args = ($args_lambda)(); },
+        _ => quote! { let args = (args)(); },
     }
 }
 
