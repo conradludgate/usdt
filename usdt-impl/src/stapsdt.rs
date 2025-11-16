@@ -226,7 +226,7 @@ fn compile_probe(
                     "990:   nop",
                     #probe_rec,
                     #in_regs
-                    options(nomem, nostack, preserves_flags)
+                    options(readonly, nostack, preserves_flags)
                 );
             }
         }

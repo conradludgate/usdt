@@ -210,7 +210,7 @@ fn compile_probe(
                     extern_probe_fn = sym #extern_probe_fn,
                     stability = sym #stability_fn,
                     #in_regs
-                    options(nomem, nostack, preserves_flags)
+                    options(readonly, nostack, preserves_flags)
                 );
             }
         }
