@@ -220,6 +220,16 @@ fn compile_probe(
         if is_enabled != 0 {
             #unpacked_args
             #type_check_fn
+
+            // Safety:
+            //
+            // Our assembly here is only ever going to be a nop, or an interrupt.
+            // Neither of those will effect the behaviour of this rust program.
+            //
+            // asm options:
+            // * readonly - we may pass in `*const u8` (c-strings), which might be read by the interrupt handler.
+            // * nostack - this might be incorrect (unclear), int3 on x86 will push EFLAGS to the stack.
+            // * preserve_flags - int3 on x86 will preserve the flags
             #[allow(named_asm_labels)]
             unsafe {
                 ::std::arch::asm!(
